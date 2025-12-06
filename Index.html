@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Eco Chess: Battle for Nature</title>
+    <style>
+        :root {
+            --primary: #2ecc71;
+            --secondary: #27ae60;
+            --danger: #e74c3c;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --highlight: rgba(52, 152, 219, 0.5);
+            --board-w: #f0d9b5;
+            --board-b: #b58863;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--dark);
+            color: var(--light);
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- UI Header --- */
+        #game-header {
+            width: 100%;
+            max-width: 450px;
+            padding: 4px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            flex-shrink: 0;
+            height: 45px;
+        }
+
+        .stat-box {
+            text-align: center;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        #streak-display span {
+            color: yellow;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .info-btn {
+            background: var(--highlight);
+            border: 2px solid white;
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-family: monospace;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        /* --- Power Up Bar --- */
+        #powerup-bar {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            justify-content: space-around;
+            padding: 6px;
+            background: #34495e;
+            opacity: 0.5;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            flex-shrink: 0;
+        }
+
+        #powerup-bar.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .power-btn {
+            background: none;
+            border: 2px solid var(--light);
+            color: white;
+            border-radius: 5px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin: 0 5px;
+        }
+
+        .power-btn:hover { background: rgba(255,255,255,0.2); }
+
+        /* --- Game Board Wrapper --- */
+        #board-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 10px;
+            padding-bottom: 40px;
+            overflow: hidden;
+        }
+
+        #chess-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            width: 90vw; 
+            height: 135vw; 
+            max-width: 400px;
+            max-height: 600px;
+            max-height: calc(100dvh - 140px);
+            max-width: calc((100dvh - 140px) * (4/6));
+            border: 5px solid #5d4037;
+            position: relative;
+            background-color: #5d4037;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1.5rem, 8vw, 2.5rem); 
+            cursor: pointer;
+            position: relative;
+        }
+
+        .cell.white { background-color: var(--board-w); }
+        .cell.black { background-color: var(--board-b); }
+
+        .cell.selected {
+            background-color: rgba(255, 255, 0, 0.6) !important;
+        }
+
+        .cell.highlight {
+            position: relative;
+        }
+
+        .cell.highlight::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: var(--highlight);
+            border-radius: 50%;
+            transform: scale(0.6);
+            animation: pulse 1s infinite;
+        }
+
+        .piece {
+            z-index: 2;
+            transition: transform 0.2s;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+            pointer-events: none; 
+        }
+        
+        .piece.enemy {
+            filter: drop-shadow(0px 0px 5px red);
+        }
+
+        /* --- Modals --- */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+            backdrop-filter: blur(2px);
+        }
+
+        .hidden { display: none !important; }
+
+        .modal-content {
+            background: #ffffff !important;
+            color: #000000 !important;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid #ccc;
+        }
+        
+        /* Info Modal Specifics */
+        .info-table {
+            width: 100%;
+            text-align: left;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #000;
+        }
+        .info-table td {
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .info-header {
+            background: #eee;
+            font-weight: bold;
+        }
+        .info-icon { font-size: 1.2rem; text-align: center; }
+
+        /* Quiz & Promo Buttons */
+        .quiz-options button, .promo-options button {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        .quiz-options button:active, .promo-options button:active {
+            transform: scale(0.98);
+        }
+
+        .quiz-options button:hover, .promo-options button:hover { background: var(--secondary); }
+        
+        /* Promo Specific Colors */
+        .promo-options button {
+            background: #2980b9;
+        }
+        .promo-options button:hover {
+            background: #3498db;
+        }
+
+        #turn-indicator {
+            padding: 8px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            background: #e67e22;
+            width: 100%;
+            text-align: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.6); opacity: 0.7; }
+            50% { transform: scale(0.8); opacity: 0.4; }
+            100% { transform: scale(0.6); opacity: 0.7; }
+        }
+        
+        .shielded::before {
+            content: '🛡️';
+            position: absolute;
+            font-size: 1.2rem;
+            top: 2px;
+            right: 2px;
+            z-index: 3;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-header">
+        <div class="stat-box">🌲 Life: <span id="tree-hp">Alive</span></div>
+        <div class="stat-box" id="streak-display">Streak: <span id="streak-count">0</span>/3</div>
+        <div class="stat-box">🛡️ Shield: <span id="shield-count">0</span></div>
+        <button class="info-btn" onclick="openInfo()">i</button>
+    </div>
+
+    <div id="turn-indicator">Giliranmu! Pilih pion hijau.</div>
+
+    <div id="powerup-bar">
+        <button class="power-btn" onclick="activatePowerUp('rain')" title="Rain Blessing: Padamkan Api">🌧️</button>
+        <button class="power-btn" onclick="activatePowerUp('recycle')" title="Recycle: Hidupkan 1 Teman">♻️</button>
+        <button class="power-btn" onclick="activatePowerUp('shield')" title="Water Shield: Tahan 2 Serangan">💧</button>
+    </div>
+
+    <div id="board-container">
+        <div id="chess-board">
+            <!-- Cells generated by JS -->
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Jawab untuk Bergerak!</h3>
+            <div id="q-text" class="quiz-question">...</div>
+            <div id="q-options" class="quiz-options"></div>
+        </div>
+    </div>
+    
+    <!-- Promotion Modal -->
+    <div id="promo-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Pilih Promosi!</h3>
+            <p>Bibitmu telah tumbuh besar. Pilih bentuk barunya:</p>
+            <div class="promo-options">
+                <button onclick="finalizePromotion('P_WATER')">💧 Menara Air (Benteng)</button>
+                <button onclick="finalizePromotion('P_AIR')">🍃 Udara Segar (Gajah)</button>
+                <button onclick="finalizePromotion('P_ANIMAL')">🦌 Satwa Penjaga (Kuda)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="modal hidden">
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="text-align: center; margin-top:0;">Panduan Game</h3>
+            
+            <h4 style="margin-bottom:5px;">Tim Pemain (Hijau)</h4>
+            <table class="info-table">
+                <tr class="info-header"><td>Pion</td><td>Nama</td><td>Gerak</td></tr>
+                <tr><td class="info-icon">🌳</td><td>Pohon (Raja)</td><td>1 kotak segala arah</td></tr>
+                <tr><td class="info-icon">💧</td><td>Air (Benteng)</td><td>Lurus Horizontal/Vertikal</td></tr>
+                <tr><td class="info-icon">🍃</td><td>Udara (Gajah)</td><td>Diagonal & Swap dgn Bibit</td></tr>
+                <tr><td class="info-icon">🦌</td><td>Hewan (Kuda)</td><td>Bentuk L</td></tr>
+                <tr><td class="info-icon">🌱</td><td>Bibit (Pion)</td><td>Maju 1 / Makan Diagonal</td></tr>
+            </table>
+
+            <h4 style="margin-bottom:5px; margin-top:15px;">Tim Musuh (Polusi)</h4>
+            <table class="info-table">
+                <tr><td class="info-icon">🏭</td><td>Pabrik (Raja)</td><td>Harus Dihancurkan!</td></tr>
+                <tr><td class="info-icon">🔥</td><td>Api</td><td>Gerak lurus</td></tr>
+                <tr><td class="info-icon">🌫️</td><td>Asap</td><td>Diagonal & Swap dgn Botol</td></tr>
+                <tr><td class="info-icon">☣️</td><td>Limbah</td><td>Bentuk L (Kuda)</td></tr>
+                <tr><td class="info-icon">🧴</td><td>Botol</td><td>Maju 1 langkah</td></tr>
+            </table>
+
+            <h4 style="margin-bottom:5px; margin-top:15px;">Power Ups (Streak 3x)</h4>
+            <table class="info-table">
+                <tr><td class="info-icon">🌧️</td><td>Hujan</td><td>Padamkan semua api (🔥)</td></tr>
+                <tr><td class="info-icon">♻️</td><td>Recycle</td><td>Hidupkan 1 teman acak</td></tr>
+                <tr><td class="info-icon">💧</td><td>Shield</td><td>Tahan 2 serangan musuh</td></tr>
+            </table>
+            
+            <p style="font-size:0.8rem; margin-top:15px; color:#555;"><i>*Pion yang mencapai ujung papan dapat promosi.<br>*Asap (Musuh) & Udara (Pemain) bisa tukar posisi dengan pion kecil (Botol/Bibit) di sebelahnya.</i></p>
+
+            <button onclick="closeInfo()" style="width:100%; padding:10px; margin-top:20px; background:#333; color:white; border:none; border-radius:5px;">Tutup</button>
+        </div>
+    </div>
+
+    <!-- Message Modal (Start/Win/Lose) -->
+    <div id="msg-modal" class="modal">
+        <div class="modal-content">
+            <h1 id="msg-title" style="margin-top:0;">Eco Chess</h1>
+            <p id="msg-body" style="line-height:1.5;">Lindungi Pohon Kehidupan 🌳 dari Polusi!<br>Jawab kuis untuk bergerak.<br>3 Benar = Power Up.</p>
+            <button onclick="startGame()" style="background:var(--primary); color:white; padding:12px 30px; border:none; border-radius:30px; font-size:1.2rem; font-weight:bold; margin-top:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">Mulai Main</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * ECO CHESS - LOGIC & DATA
+ */
+
+// --- DATA: QUESTIONS ---
+const questionsDB = [
+    {q: "Apa yang dimaksud ekosistem?", a: ["Hubungan makhluk hidup & lingkungan", "Hubungan benda mati saja"], c: 0},
+    {q: "Contoh interaksi biotik-biotik adalah...", a: ["Predator memakan mangsa", "Angin bertiup"], c: 0},
+    {q: "Konsumen tingkat pertama adalah...", a: ["Pemakan tumbuhan", "Pemakan daging"], c: 0},
+    {q: "Rantai makanan dimulai dari...", a: ["Produsen", "Konsumen"], c: 0},
+    {q: "Jika populasi ular turun, tikus akan...", a: ["Meningkat", "Menurun"], c: 0},
+    {q: "Hutan hujan disebut 'paru-paru dunia' karena...", a: ["Menghasilkan oksigen", "Menghasilkan batu bara"], c: 0},
+    {q: "Energi utama ekosistem berasal dari...", a: ["Matahari", "Bulan"], c: 0},
+    {q: "Simbiosis mutualisme adalah...", a: ["Saling menguntungkan", "Satu untung satu rugi"], c: 0},
+    {q: "Contoh dekomposer adalah...", a: ["Jamur", "Elang"], c: 0},
+    {q: "Aktivitas perusak ekosistem...", a: ["Deforestasi", "Reboisasi"], c: 0},
+    {q: "Keanekaragaman hayati penting untuk...", a: ["Keseimbangan alam", "Menghambat kehidupan"], c: 0},
+    {q: "Hewan endemik adalah...", a: ["Hanya hidup di daerah tertentu", "Hidup di semua tempat"], c: 0},
+    {q: "Ancaman terbesar hayati...", a: ["Perburuan liar", "Penelitian"], c: 0},
+    {q: "Fungsi cagar alam...", a: ["Melindungi flora/fauna", "Tempat pabrik"], c: 0},
+    {q: "Penyu hijau terancam karena...", a: ["Sampah plastik", "Air biru"], c: 0},
+    {q: "Penyebab utama polusi udara kota...", a: ["Kendaraan bermotor", "Foto copy"], c: 0},
+    {q: "Plastik berbahaya karena...", a: ["Sulit terurai", "Mudah busuk"], c: 0},
+    {q: "Contoh sampah organik...", a: ["Sisa makanan", "Kaleng"], c: 0},
+    {q: "Cara kurangi plastik...", a: ["Bawa tas sendiri", "Beli plastik baru"], c: 0},
+    {q: "Biopori digunakan untuk...", a: ["Menyerap air hujan", "Menahan angin"], c: 0},
+    {q: "Contoh 3R adalah...", a: ["Reduce, Reuse, Recycle", "Record, Remove, Restart"], c: 0},
+    {q: "Penyebab pemanasan global...", a: ["Emisi gas rumah kaca", "Tanaman tumbuh"], c: 0},
+    {q: "Gas rumah kaca terbanyak...", a: ["Karbon dioksida", "Nitrogen"], c: 0},
+    {q: "Efek pemanasan global...", a: ["Kenaikan muka laut", "Udara dingin"], c: 0},
+    {q: "Fungsi lapisan ozon...", a: ["Lindungi dari UV", "Serap Oksigen"], c: 0},
+    {q: "Energi terbarukan contohnya...", a: ["Tenaga surya", "Batu bara"], c: 0},
+    {q: "Hemat energi di rumah dengan...", a: ["Matikan lampu siang", "AC terus menerus"], c: 0},
+    {q: "Panel surya mengubah cahaya jadi...", a: ["Listrik", "Batu"], c: 0},
+    {q: "Gempa bumi terjadi karena...", a: ["Pergerakan lempeng", "Pelangi"], c: 0},
+    {q: "Tanda awal tsunami...", a: ["Air laut surut jauh", "Angin lembut"], c: 0},
+    {q: "Saat gempa, sebaiknya...", a: ["Lindungi kepala/bawah meja", "Lari tak tentu arah"], c: 0},
+    {q: "Reboisasi berarti...", a: ["Menanam kembali hutan", "Menebang pohon"], c: 0},
+    {q: "Fungsi hutan mangrove...", a: ["Menahan abrasi", "Menyebabkan gempa"], c: 0},
+    {q: "Microplastic berbahaya karena...", a: ["Termakan hewan laut", "Jadi pupuk"], c: 0}
+];
+
+// --- GAME CONFIG & STATE ---
+const ROWS = 6;
+const COLS = 4;
+const BOARD_SIZE = ROWS * COLS;
+
+// Piece IDs
+const P_TREE = '🌳'; // King
+const P_WATER = '💧'; // Rook
+const P_AIR = '🍃'; // Bishop
+const P_ANIMAL = '🦌'; // Knight
+const P_SEED = '🌱'; // Pawn
+
+const E_FACTORY = '🏭'; // King
+const E_BOTTLE = '🧴'; // Pawn
+const E_WASTE = '☣️'; // Pawn (Now moves like Knight)
+const E_FIRE = '🔥'; // Rook
+const E_SMOG = '🌫️'; // Bishop (Range 1)
+
+let board = [];
+let turn = 'player'; // 'player' or 'enemy'
+let selectedIdx = -1;
+let streak = 0;
+let shield = 0;
+let isGameOver = false;
+let pendingMoveTo = -1; // Destination index waiting for quiz result
+let currentPromotionIndex = -1; // To track where promotion happens
+let questionPool = []; // For random unique questions
+
+// --- SOUND ENGINE (Synthesized) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+    
+    if (type === 'select') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+    } else if (type === 'correct') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.setValueAtTime(800, now + 0.1);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } else if (type === 'move') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+    } else if (type === 'win') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.2);
+        osc.frequency.setValueAtTime(783.99, now + 0.4);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 1);
+        osc.start(now);
+        osc.stop(now + 1);
+    } else if (type === 'lose') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 1);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 1);
+        osc.start(now);
+        osc.stop(now + 1);
+    }
+}
+
+// --- INIT ---
+function initBoard() {
+    // 0  1  2  3
+    // 4  5  6  7
+    // ...
+    // 20 21 22 23
+    
+    board = new Array(BOARD_SIZE).fill(null);
+
+    // Enemy Setup (UPDATED: Waste swapped with Fire)
+    // Row 0: Waste, Smog, Factory, Fire
+    board[0] = { type: E_WASTE, team: 'enemy' };
+    board[1] = { type: E_SMOG, team: 'enemy' };
+    board[2] = { type: E_FACTORY, team: 'enemy' }; // King
+    board[3] = { type: E_FIRE, team: 'enemy' };   
+
+    // Row 1: 4 Plastic Bottles
+    board[4] = { type: E_BOTTLE, team: 'enemy' };
+    board[5] = { type: E_BOTTLE, team: 'enemy' };
+    board[6] = { type: E_BOTTLE, team: 'enemy' };
+    board[7] = { type: E_BOTTLE, team: 'enemy' };
+
+    // Player Setup (Rows 4-5) - Unchanged
+    board[16] = { type: P_SEED, team: 'player' };
+    board[17] = { type: P_SEED, team: 'player' };
+    board[18] = { type: P_SEED, team: 'player' };
+    board[19] = { type: P_SEED, team: 'player' };
+    board[20] = { type: P_WATER, team: 'player' };
+    board[21] = { type: P_TREE, team: 'player' }; // Player King
+    board[22] = { type: P_AIR, team: 'player' };
+    board[23] = { type: P_ANIMAL, team: 'player' };
+    
+    // Reset question pool
+    questionPool = [...questionsDB];
+}
+
+function startGame() {
+    initBoard();
+    turn = 'player';
+    streak = 0;
+    shield = 0;
+    isGameOver = false;
+    document.getElementById('msg-modal').classList.add('hidden');
+    updateUI();
+    renderBoard();
+}
+
+function getCoords(index) {
+    return { r: Math.floor(index / COLS), c: index % COLS };
+}
+
+function getIndex(r, c) {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return -1;
+    return r * COLS + c;
+}
+
+// --- MOVE LOGIC ---
+// Updated to accept an optional board state for simulation
+function getValidMoves(index, currentBoard = board) {
+    const piece = currentBoard[index];
+    if (!piece) return [];
+
+    const moves = [];
+    const { r, c } = getCoords(index);
+    const forwardDir = piece.team === 'player' ? -1 : 1; 
+
+    const addMove = (nr, nc) => {
+        const nIdx = getIndex(nr, nc);
+        if (nIdx === -1) return;
+        const target = currentBoard[nIdx];
+        if (!target) {
+            moves.push(nIdx); // Empty
+        } else if (target.team !== piece.team) {
+            moves.push(nIdx); // Capture
+        }
+    };
+
+    // Movement Rules
+    switch (piece.type) {
+        case P_TREE: // King: 1 step any dir
+        case E_FACTORY:
+            const kOffsets = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+            kOffsets.forEach(([dr, dc]) => addMove(r + dr, c + dc));
+            break;
+
+        case P_WATER: // Rook: Sliding
+        case E_FIRE: // Enemy Rook (Crawling/Sliding)
+            const rDirs = [[-1,0], [1,0], [0,-1], [0,1]];
+            rDirs.forEach(([dr, dc]) => {
+                for (let i = 1; i < ROWS; i++) {
+                    const nr = r + (dr * i), nc = c + (dc * i);
+                    const nIdx = getIndex(nr, nc);
+                    if (nIdx === -1) break;
+                    const target = currentBoard[nIdx];
+                    if (!target) {
+                        moves.push(nIdx);
+                    } else {
+                        if (target.team !== piece.team) moves.push(nIdx);
+                        break; // Blocked
+                    }
+                }
+            });
+            break;
+
+        case P_AIR: // Bishop: Sliding + SWAP (Player)
+            // 1. Sliding Diagonal Moves (Existing)
+            const bDirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
+            bDirs.forEach(([dr, dc]) => {
+                for (let i = 1; i < ROWS; i++) {
+                    const nr = r + (dr * i), nc = c + (dc * i);
+                    const nIdx = getIndex(nr, nc);
+                    if (nIdx === -1) break;
+                    const target = currentBoard[nIdx];
+                    if (!target) {
+                        moves.push(nIdx);
+                    } else {
+                        if (target.team !== piece.team) moves.push(nIdx);
+                        break; // Blocked
+                    }
+                }
+            });
+
+            // 2. SWAP Logic (Adjacent to P_SEED)
+            const pNeighbors = [[-1,0], [1,0], [0,-1], [0,1]];
+            pNeighbors.forEach(([dr, dc]) => {
+                const nr = r + dr;
+                const nc = c + dc;
+                const nIdx = getIndex(nr, nc);
+                if (nIdx !== -1) {
+                    const neighborPiece = currentBoard[nIdx];
+                    // Can swap with own team's SEED
+                    if (neighborPiece && neighborPiece.type === P_SEED && neighborPiece.team === 'player') {
+                         moves.push(nIdx); 
+                    }
+                }
+            });
+            break;
+
+        case E_SMOG: // Weak Bishop: 1 step diagonal + SWAP (Khusus Musuh)
+            // 1. Diagonal Moves
+            const sDirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
+            sDirs.forEach(([dr, dc]) => addMove(r + dr, c + dc));
+            
+            // 2. SWAP Logic (Adjacent to E_BOTTLE)
+            const neighbors = [[-1,0], [1,0], [0,-1], [0,1]];
+            neighbors.forEach(([dr, dc]) => {
+                const nr = r + dr;
+                const nc = c + dc;
+                const nIdx = getIndex(nr, nc);
+                if (nIdx !== -1) {
+                    const neighborPiece = currentBoard[nIdx];
+                    // Can swap with own team's BOTTLE
+                    if (neighborPiece && neighborPiece.type === E_BOTTLE && neighborPiece.team === 'enemy') {
+                         moves.push(nIdx); 
+                    }
+                }
+            });
+            break;
+
+        case P_ANIMAL: // Knight: L-shape
+        case E_WASTE: // NEW: Waste moves like Knight (L)
+            const knOffsets = [[-2,-1],[-2,1],[2,-1],[2,1],[-1,-2],[-1,2],[1,-2],[1,2]];
+            knOffsets.forEach(([dr, dc]) => addMove(r + dr, c + dc));
+            break;
+
+        case P_SEED: // Pawn
+        case E_BOTTLE:
+            // Move Forward 1
+            const fIdx = getIndex(r + forwardDir, c);
+            if (fIdx !== -1 && !currentBoard[fIdx]) moves.push(fIdx);
+            // Capture Diagonal
+            const capDirs = [-1, 1];
+            capDirs.forEach(dc => {
+                const cIdx = getIndex(r + forwardDir, c + dc);
+                if (cIdx !== -1 && currentBoard[cIdx] && currentBoard[cIdx].team !== piece.team) {
+                    moves.push(cIdx);
+                }
+            });
+            break;
+    }
+
+    return moves;
+}
+
+// --- INTERACTION ---
+function handleCellClick(index) {
+    if (isGameOver || turn !== 'player') return;
+
+    const clickedPiece = board[index];
+
+    // If clicking a valid move target (green circle)
+    if (selectedIdx !== -1 && getValidMoves(selectedIdx, board).includes(index)) {
+        pendingMoveTo = index;
+        playSound('select');
+        showQuiz();
+        return;
+    }
+
+    // Select Player Piece
+    if (clickedPiece && clickedPiece.team === 'player') {
+        selectedIdx = index;
+        playSound('select');
+        renderBoard();
+        return;
+    }
+    
+    // Deselect
+    selectedIdx = -1;
+    renderBoard();
+}
+
+function executeMove(from, to) {
+    const mover = board[from];
+    const target = board[to];
+
+    // Shield Logic (Player Defense)
+    // Only applies if it's an attack (capture), not a swap
+    if (target && target.team === 'player' && mover.team === 'enemy' && shield > 0) {
+        shield--;
+        updateUI();
+        playSound('correct'); 
+        return;
+    }
+    
+    // SWAP Logic (Enemy: Smog<->Bottle, Player: Air<->Seed)
+    const isEnemySwap = mover.type === E_SMOG && target && target.type === E_BOTTLE && mover.team === target.team;
+    const isPlayerSwap = mover.type === P_AIR && target && target.type === P_SEED && mover.team === target.team;
+
+    if (isEnemySwap || isPlayerSwap) {
+        board[to] = mover;
+        board[from] = target; // Swap
+        selectedIdx = -1;
+        playSound('move');
+        renderBoard();
+        return; // Turn switch handled by caller (answerQuiz or enemyTurn)
+    }
+
+    // Win/Lose Condition
+    if (target && target.team !== mover.team) {
+        if (target.type === E_FACTORY) endGame('win');
+        if (target.type === P_TREE) endGame('lose');
+    }
+
+    // --- PROMOTION LOGIC MODIFIED ---
+
+    // 1. Move the piece physically first (Standard Move/Capture)
+    board[to] = mover;
+    board[from] = null;
+    selectedIdx = -1;
+
+    // 2. Check Player Promotion
+    if (mover.type === P_SEED && Math.floor(to / COLS) === 0) {
+        // Show Promotion Modal
+        playSound('move');
+        renderBoard();
+        currentPromotionIndex = to;
+        document.getElementById('promo-modal').classList.remove('hidden');
+        return; // HALT HERE! Don't end turn yet.
+    }
+
+    // 3. Check Enemy Promotion (Auto)
+    if (mover.type === E_BOTTLE && Math.floor(to / COLS) === (ROWS - 1)) {
+        mover.type = E_FIRE; // Enemy Promotes to Rook (Strongest)
+    }
+
+    // 4. Standard completion if no user-interruption
+    playSound('move');
+    renderBoard();
+}
+
+// --- PROMOTION HANDLER ---
+function finalizePromotion(choice) {
+    if (currentPromotionIndex === -1) return;
+
+    // Convert string choice to Variable
+    let newType = P_SEED;
+    if (choice === 'P_WATER') newType = P_WATER;
+    if (choice === 'P_AIR') newType = P_AIR;
+    if (choice === 'P_ANIMAL') newType = P_ANIMAL;
+
+    board[currentPromotionIndex].type = newType;
+    
+    // Close Modal
+    document.getElementById('promo-modal').classList.add('hidden');
+    currentPromotionIndex = -1;
+    
+    playSound('correct');
+    renderBoard();
+
+    // Trigger Enemy Turn
+    turn = 'enemy';
+    document.getElementById('turn-indicator').textContent = "Giliran Musuh...";
+    document.getElementById('turn-indicator').style.background = "#e74c3c";
+    setTimeout(enemyTurn, 1000);
+}
+
+// --- QUIZ SYSTEM ---
+function showQuiz() {
+    const modal = document.getElementById('quiz-modal');
+    const qText = document.getElementById('q-text');
+    const qOpts = document.getElementById('q-options');
+
+    // Random unique question logic
+    if (questionPool.length === 0) {
+        questionPool = [...questionsDB]; // Reset/Refill
+    }
+    
+    // Splice random question from pool
+    const randomIndex = Math.floor(Math.random() * questionPool.length);
+    const qData = questionPool.splice(randomIndex, 1)[0];
+    
+    qText.textContent = qData.q;
+    qOpts.innerHTML = '';
+
+    // Shuffle options roughly
+    const isSwap = Math.random() > 0.5;
+    const labels = isSwap ? [qData.a[1], qData.a[0]] : [qData.a[0], qData.a[1]];
+    const correctIdx = isSwap ? (qData.c === 0 ? 1 : 0) : qData.c;
+
+    labels.forEach((txt, idx) => {
+        const btn = document.createElement('button');
+        btn.textContent = txt;
+        btn.onclick = () => answerQuiz(idx === correctIdx);
+        qOpts.appendChild(btn);
+    });
+
+    modal.classList.remove('hidden');
+}
+
+function answerQuiz(isCorrect) {
+    document.getElementById('quiz-modal').classList.add('hidden');
+    
+    if (isCorrect) {
+        playSound('correct');
+        streak++;
+        executeMove(selectedIdx, pendingMoveTo);
+        
+        if (streak >= 3) {
+            document.getElementById('powerup-bar').classList.add('active');
+        }
+        
+        updateUI();
+        
+        // Note: Turn change happens in executeMove -> finalizePromotion if promotion occurs
+        // If NO promotion, executeMove finishes and we must trigger turn here IF logic didn't halt
+        const mover = board[pendingMoveTo]; // board has been updated inside executeMove?
+        // Wait, executeMove updates board. We need to check if promotion halted the flow.
+        
+        // We know promotion halts if P_SEED reaches row 0. 
+        // We can check board state at pendingMoveTo.
+        const pieceNow = board[pendingMoveTo];
+        const isPromoting = pieceNow && pieceNow.type === P_SEED && Math.floor(pendingMoveTo/COLS) === 0;
+
+        if (!isPromoting) {
+            // Only trigger enemy if NOT promoting (Promotion triggers it manually)
+            turn = 'enemy';
+            document.getElementById('turn-indicator').textContent = "Giliran Musuh...";
+            document.getElementById('turn-indicator').style.background = "#e74c3c";
+            setTimeout(enemyTurn, 1000);
+        }
+
+    } else {
+        playSound('wrong');
+        streak = 0; // Reset streak
+        updateUI();
+        alert("Jawaban salah! Pion tidak bergerak.");
+        turn = 'enemy';
+        document.getElementById('turn-indicator').textContent = "Giliran Musuh...";
+        document.getElementById('turn-indicator').style.background = "#e74c3c";
+        selectedIdx = -1;
+        renderBoard();
+        setTimeout(enemyTurn, 1000);
+    }
+}
+
+// --- INFO MODAL ---
+function openInfo() {
+    document.getElementById('info-modal').classList.remove('hidden');
+}
+
+function closeInfo() {
+    document.getElementById('info-modal').classList.add('hidden');
+}
+
+// --- POWER UPS ---
+function activatePowerUp(type) {
+    if (streak < 3) return;
+
+    if (type === 'rain') {
+        // Remove all fires
+        let removed = false;
+        for (let i=0; i<BOARD_SIZE; i++) {
+            if (board[i] && board[i].type === E_FIRE) {
+                board[i] = null;
+                removed = true;
+            }
+        }
+        if(removed) playSound('correct');
+    } else if (type === 'recycle') {
+        // Revive a piece in random empty spot rows 4-5
+        const emptySlots = [];
+        for (let i=16; i<24; i++) {
+            if (!board[i]) emptySlots.push(i);
+        }
+        if (emptySlots.length > 0) {
+            const spot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+            const types = [P_WATER, P_AIR, P_ANIMAL, P_SEED];
+            board[spot] = { type: types[Math.floor(Math.random()*types.length)], team: 'player' };
+            playSound('correct');
+        }
+    } else if (type === 'shield') {
+        shield = 2;
+        playSound('correct');
+    }
+
+    streak = 0;
+    document.getElementById('powerup-bar').classList.remove('active');
+    updateUI();
+    renderBoard();
+}
+
+// --- INTELLIGENT AI (ENEMY) ---
+
+// Helper to get piece value
+function getPieceValue(piece) {
+    if (!piece) return 0;
+    switch (piece.type) {
+        case P_TREE: return 10000;
+        case E_FACTORY: return 10000;
+        case P_WATER: case E_FIRE: return 50;
+        case P_AIR: case E_SMOG: return 30;
+        case P_ANIMAL: return 30;
+        case E_WASTE: return 30; // Waste now moves like Knight
+        case P_SEED: case E_BOTTLE: return 10;
+        default: return 0;
+    }
+}
+
+// Helper to check if a square is threatened by any player piece
+function isSquareThreatened(boardState, squareIndex) {
+    for (let i = 0; i < BOARD_SIZE; i++) {
+        const piece = boardState[i];
+        if (piece && piece.team === 'player') {
+            const validMoves = getValidMoves(i, boardState);
+            if (validMoves.includes(squareIndex)) return true;
+        }
+    }
+    return false;
+}
+
+function enemyTurn() {
+    if (isGameOver) return;
+
+    // 1. Collect all valid moves
+    let allMoves = [];
+    board.forEach((p, i) => {
+        if (p && p.team === 'enemy') {
+            const moves = getValidMoves(i, board);
+            moves.forEach(target => {
+                allMoves.push({ from: i, to: target });
+            });
+        }
+    });
+
+    if (allMoves.length === 0) {
+        endEnemyTurn();
+        return;
+    }
+
+    // 2. Score Moves using "Smart Evaluation"
+    let bestMove = null;
+    let highestScore = -Infinity;
+
+    allMoves.forEach(m => {
+        // Simulate Move
+        const tempBoard = [...board]; // Shallow copy works as we only move references
+        const mover = tempBoard[m.from];
+        const target = tempBoard[m.to];
+        
+        let score = 0;
+        
+        if (target) {
+            if (target.team === mover.team) {
+                // Swap Move (Smog <-> Bottle)
+                // Treat as minor positional move, don't prioritize over killing unless stuck
+                score += 5; 
+            } else {
+                // Base Score: Capture Value
+                score += getPieceValue(target);
+                if (target.type === P_TREE) score += 100000; // Immediate Win Priority
+            }
+        }
+
+        // Positional Score: Move Forward preference (small)
+        if (m.to > m.from) score += 1;
+        
+        // Promotion Incentive
+        if (mover.type === E_BOTTLE && Math.floor(m.to / COLS) === (ROWS - 1)) {
+            score += 40; // High incentive to promote to Rook
+        }
+
+        // Apply Move to Temp Board to check safety (Swap logic handled differently but for simplicity treating as update)
+        tempBoard[m.to] = mover;
+        tempBoard[m.from] = (target && target.team === mover.team) ? target : null;
+
+        // RISK ASSESSMENT:
+        // Check if the piece is safe at the new location
+        if (isSquareThreatened(tempBoard, m.to)) {
+             score -= getPieceValue(mover);
+        }
+
+        // DEFENSE BONUS:
+        // If the piece was currently under threat and moves to safety, add points
+        if (isSquareThreatened(board, m.from) && !isSquareThreatened(tempBoard, m.to)) {
+            score += 5; // Survival Instinct
+        }
+
+        // Randomness to break ties
+        score += Math.random() * 0.5;
+
+        if (score > highestScore) {
+            highestScore = score;
+            bestMove = m;
+        }
+    });
+
+    // 3. Execute
+    executeMove(bestMove.from, bestMove.to);
+    
+    if (!isGameOver) endEnemyTurn();
+}
+
+function endEnemyTurn() {
+    turn = 'player';
+    document.getElementById('turn-indicator').textContent = "Giliranmu! Pilih pion hijau.";
+    document.getElementById('turn-indicator').style.background = "#e67e22";
+}
+
+// --- RENDERING ---
+function renderBoard() {
+    const container = document.getElementById('chess-board');
+    container.innerHTML = '';
+
+    const validMoves = selectedIdx !== -1 ? getValidMoves(selectedIdx, board) : [];
+
+    for (let i = 0; i < BOARD_SIZE; i++) {
+        const cell = document.createElement('div');
+        const { r, c } = getCoords(i);
+        
+        // Checker pattern
+        const isWhite = (r + c) % 2 === 0;
+        cell.className = `cell ${isWhite ? 'white' : 'black'}`;
+        
+        if (i === selectedIdx) cell.classList.add('selected');
+        if (validMoves.includes(i)) cell.classList.add('highlight');
+        if (shield > 0 && board[i] && board[i].team === 'player') cell.classList.add('shielded');
+
+        const piece = board[i];
+        if (piece) {
+            const span = document.createElement('span');
+            span.textContent = piece.type;
+            span.className = `piece ${piece.team}`;
+            cell.appendChild(span);
+        }
+
+        cell.onclick = () => handleCellClick(i);
+        container.appendChild(cell);
+    }
+}
+
+function updateUI() {
+    document.getElementById('streak-count').textContent = streak;
+    document.getElementById('shield-count').textContent = shield;
+    document.getElementById('tree-hp').textContent = isGameOver ? "Dead" : "Alive";
+    
+    if (streak >= 3) {
+        document.getElementById('powerup-bar').classList.add('active');
+    } else {
+        document.getElementById('powerup-bar').classList.remove('active');
+    }
+}
+
+function endGame(result) {
+    isGameOver = true;
+    const modal = document.getElementById('msg-modal');
+    const title = document.getElementById('msg-title');
+    const body = document.getElementById('msg-body');
+
+    modal.classList.remove('hidden');
+    if (result === 'win') {
+        playSound('win');
+        title.textContent = "MENANG!";
+        body.innerHTML = "Kamu berhasil menghancurkan Pabrik Polusi!<br>Alam kembali lestari.";
+        title.style.color = "var(--primary)";
+    } else {
+        playSound('lose');
+        title.textContent = "GAME OVER";
+        body.innerHTML = "Pohon Kehidupan telah mati.<br>Polusi menguasai dunia.";
+        title.style.color = "var(--danger)";
+    }
+}
+
+// Start first time
+initBoard();
+renderBoard();
+
+</script>
+</body>
+</html>
